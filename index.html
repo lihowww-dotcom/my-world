@@ -164,32 +164,32 @@
   body.touch-ui canvas { touch-action: none; }
 
   #joystick {
-    position: absolute; bottom: 100px; left: 20px;
-    width: 180px; height: 180px; border-radius: 50%;
+    position: absolute; bottom: 100px; left: 12px;
+    width: 150px; height: 150px; border-radius: 50%;
     background: rgba(255,255,255,0.12);
     border: 2px solid rgba(255,255,255,0.3);
     z-index: 10; user-select: none;
   }
   #joyStick {
     position: absolute; left: 50%; top: 50%;
-    width: 80px; height: 80px; margin: -40px 0 0 -40px;
+    width: 64px; height: 64px; margin: -32px 0 0 -32px;
     border-radius: 50%; background: rgba(255,255,255,0.45);
     pointer-events: none;
   }
   .mobile-btn {
     position: absolute;
-    width: 90px; height: 90px; border-radius: 50%;
+    width: 80px; height: 80px; border-radius: 50%;
     background: rgba(0,0,0,0.45);
     border: 2px solid rgba(255,255,255,0.55);
-    color: #fff; font-size: 24px; font-weight: bold;
+    color: #fff; font-size: 22px; font-weight: bold;
     align-items: center; justify-content: center;
     user-select: none; z-index: 10;
   }
   .mobile-btn.press { background: rgba(255,255,255,0.35); }
-  /* Horizontal row, vertically centered with joystick (center at bottom 190px) */
-  #btnBreak { bottom: 145px; right: 16px; background: rgba(180,80,80,0.6); }
-  #btnPlace { bottom: 145px; right: 122px; background: rgba(80,150,80,0.6); }
-  #btnJump  { bottom: 145px; right: 228px; }
+  /* Right-side layout: jump bottom-right, break+place above side by side */
+  #btnJump  { bottom: 80px;  right: 16px; }
+  #btnBreak { bottom: 176px; right: 16px; background: rgba(180,80,80,0.6); }
+  #btnPlace { bottom: 176px; right: 112px; background: rgba(80,150,80,0.6); }
   #btnChat  {
     top: 10px; left: 10px;
     width: 64px; height: 38px; border-radius: 8px; font-size: 13px;
