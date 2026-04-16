@@ -36,10 +36,13 @@
   #login {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.75); color: #fff; z-index: 20;
+    padding: 20px; box-sizing: border-box;
   }
   #login form {
     background: rgba(20,20,30,0.95); padding: 24px 28px; border-radius: 8px;
-    display: flex; flex-direction: column; gap: 10px; min-width: 320px;
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 420px; box-sizing: border-box;
+    max-height: 100%; overflow-y: auto;
     box-shadow: 0 4px 30px rgba(0,0,0,0.5);
   }
   #login h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
@@ -50,13 +53,55 @@
     background: #111; color: #fff; font-family: monospace; font-size: 14px;
   }
   #login input:focus { outline: none; border-color: #6af; }
-  #login button {
+  #login button#f_submit {
     margin-top: 8px; padding: 10px; border-radius: 4px; border: 0;
     background: #4a8; color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;
   }
-  #login button:disabled { background: #555; cursor: wait; }
-  #login button:hover:not(:disabled) { background: #5ba; }
+  #login button#f_submit:disabled { background: #555; cursor: wait; }
+  #login button#f_submit:hover:not(:disabled) { background: #5ba; }
   #login .err { color: #f88; min-height: 18px; font-size: 12px; text-align: center; }
+
+  /* Room mode selector */
+  .room-choice { display: flex; gap: 8px; }
+  .room-opt {
+    flex: 1; padding: 12px 10px; border-radius: 6px;
+    border: 2px solid #333; background: #111; color: #fff;
+    cursor: pointer; text-align: center; font-family: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .room-opt.active { border-color: #4a8; background: #1a2a22; }
+  .room-opt .room-title { font-size: 14px; font-weight: bold; }
+  .room-opt .room-desc { font-size: 11px; opacity: 0.7; margin-top: 3px; }
+
+  /* Advanced section (server URL) */
+  #toggleAdvanced {
+    color: #888; font-size: 11px; text-decoration: none;
+    cursor: pointer; display: inline-block; padding: 4px 0;
+    align-self: center; margin-top: 4px;
+  }
+  #toggleAdvanced:hover { color: #bbb; }
+  #advancedFields { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  #advancedFields.hidden { display: none; }
+
+  /* Fullscreen login on touch devices */
+  body.touch-ui #login { padding: 0; }
+  body.touch-ui #login form {
+    max-width: none; width: 100%; height: 100%;
+    border-radius: 0; padding: 32px 24px;
+    justify-content: center; gap: 14px;
+  }
+  body.touch-ui #login h1 { font-size: 32px; margin-bottom: 2px; }
+  body.touch-ui #login small { font-size: 15px; margin-bottom: 12px; }
+  body.touch-ui #login label { font-size: 14px; }
+  body.touch-ui #login input {
+    font-size: 16px; padding: 14px 12px; border-radius: 6px;
+  }
+  body.touch-ui #login button#f_submit {
+    font-size: 18px; padding: 16px; margin-top: 12px;
+  }
+  body.touch-ui .room-opt { padding: 18px 12px; }
+  body.touch-ui .room-opt .room-title { font-size: 17px; }
+  body.touch-ui .room-opt .room-desc { font-size: 13px; margin-top: 4px; }
 
   /* --- Chat --- */
   #chat {
@@ -162,16 +207,33 @@
   <form id="loginForm" autocomplete="off">
     <h1>MyWorld</h1>
     <small>進入世界</small>
-    <label>伺服器</label>
-    <input id="f_server" type="text" required />
-    <label>房號</label>
-    <input id="f_room" type="text" value="lobby" required maxlength="32" pattern="[A-Za-z0-9_-]+" />
+
+    <label>模式</label>
+    <div id="roomChoice" class="room-choice">
+      <button type="button" class="room-opt active" data-room="lobby">
+        <div class="room-title">自由建造</div>
+        <div class="room-desc">共享沙盒世界</div>
+      </button>
+      <button type="button" class="room-opt" data-room="digdig">
+        <div class="room-title">搶金礦</div>
+        <div class="room-desc">3 分鐘競賽</div>
+      </button>
+    </div>
+    <input id="f_room" type="hidden" value="lobby" />
+
     <label>名字</label>
     <input id="f_name" type="text" required maxlength="24" />
     <label>密碼</label>
     <input id="f_password" type="password" required maxlength="128" />
+
     <button id="f_submit" type="submit">加入</button>
     <div id="loginErr" class="err"></div>
+
+    <a id="toggleAdvanced">進階設定 ▾</a>
+    <div id="advancedFields" class="hidden">
+      <label>伺服器</label>
+      <input id="f_server" type="text" />
+    </div>
   </form>
 </div>
 
@@ -1015,6 +1077,24 @@ const fPassword   = document.getElementById('f_password');
 // Default server URL: same origin WS (works both in dev & when served by the node server)
 fServer.value = (location.protocol === 'https:' ? 'wss://' : 'ws://')
               + (location.host || 'localhost:8080') + '/';
+
+// Room mode selector — lobby vs digdig
+const roomChoiceEl = document.getElementById('roomChoice');
+roomChoiceEl.addEventListener('click', e => {
+  const btn = e.target.closest('.room-opt');
+  if (!btn) return;
+  [...roomChoiceEl.children].forEach(el => el.classList.remove('active'));
+  btn.classList.add('active');
+  fRoom.value = btn.dataset.room;
+});
+
+// Advanced toggle (server URL)
+document.getElementById('toggleAdvanced').addEventListener('click', e => {
+  e.preventDefault();
+  const adv = document.getElementById('advancedFields');
+  adv.classList.toggle('hidden');
+  e.target.textContent = adv.classList.contains('hidden') ? '進階設定 ▾' : '進階設定 ▴';
+});
 
 loginFormEl.addEventListener('submit', e => {
   e.preventDefault();
