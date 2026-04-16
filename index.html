@@ -47,11 +47,12 @@
   }
   #login h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
   #login small { opacity: 0.7; font-size: 12px; text-align: center; margin-bottom: 6px; }
-  #login label { font-size: 12px; opacity: 0.8; }
+  #login label { font-size: 12px; opacity: 0.8; text-align: center; }
   #login input {
     padding: 8px 10px; border-radius: 4px; border: 1px solid #444;
     background: #111; color: #fff; font-family: monospace; font-size: 14px;
   }
+  #login input::placeholder { color: #666; opacity: 1; }
   #login input:focus { outline: none; border-color: #6af; }
   #login button#f_submit {
     margin-top: 8px; padding: 10px; border-radius: 4px; border: 0;
@@ -62,7 +63,7 @@
   #login .err { color: #f88; min-height: 18px; font-size: 12px; text-align: center; }
 
   /* Room mode selector */
-  .room-choice { display: flex; gap: 8px; }
+  .room-choice { display: flex; flex-direction: column; gap: 8px; }
   .room-opt {
     flex: 1; padding: 12px 10px; border-radius: 6px;
     border: 2px solid #333; background: #111; color: #fff;
@@ -90,18 +91,18 @@
     border-radius: 0; padding: 32px 24px;
     justify-content: center; gap: 14px;
   }
-  body.touch-ui #login h1 { font-size: 32px; margin-bottom: 2px; }
-  body.touch-ui #login small { font-size: 15px; margin-bottom: 12px; }
-  body.touch-ui #login label { font-size: 14px; }
+  body.touch-ui #login h1 { font-size: 36px; margin-bottom: 4px; }
+  body.touch-ui #login small { font-size: 17px; margin-bottom: 16px; }
+  body.touch-ui #login label { font-size: 16px; }
   body.touch-ui #login input {
-    font-size: 16px; padding: 14px 12px; border-radius: 6px;
+    font-size: 18px; padding: 16px 14px; border-radius: 6px;
   }
   body.touch-ui #login button#f_submit {
-    font-size: 18px; padding: 16px; margin-top: 12px;
+    font-size: 20px; padding: 18px; margin-top: 14px;
   }
-  body.touch-ui .room-opt { padding: 18px 12px; }
-  body.touch-ui .room-opt .room-title { font-size: 17px; }
-  body.touch-ui .room-opt .room-desc { font-size: 13px; margin-top: 4px; }
+  body.touch-ui .room-opt { padding: 20px 14px; }
+  body.touch-ui .room-opt .room-title { font-size: 20px; }
+  body.touch-ui .room-opt .room-desc { font-size: 14px; margin-top: 5px; }
 
   /* --- Chat --- */
   #chat {
@@ -205,10 +206,8 @@
 <!-- Login form (shown until connected & welcomed) -->
 <div id="login">
   <form id="loginForm" autocomplete="off">
-    <h1>MyWorld</h1>
-    <small>進入世界</small>
+    <h1>我的世界</h1>
 
-    <label>模式</label>
     <div id="roomChoice" class="room-choice">
       <button type="button" class="room-opt active" data-room="lobby">
         <div class="room-title">自由建造</div>
@@ -221,10 +220,8 @@
     </div>
     <input id="f_room" type="hidden" value="lobby" />
 
-    <label>名字</label>
-    <input id="f_name" type="text" required maxlength="24" />
-    <label>密碼</label>
-    <input id="f_password" type="password" required maxlength="128" />
+    <input id="f_name" type="text" required maxlength="24" placeholder="名字" />
+    <input id="f_password" type="password" required maxlength="128" placeholder="密碼" />
 
     <button id="f_submit" type="submit">加入</button>
     <div id="loginErr" class="err"></div>
