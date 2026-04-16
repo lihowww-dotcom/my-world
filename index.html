@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>MyWorld — Three.js Minecraft</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: monospace; background: #87ceeb; }
+  #info {
+    position: absolute; top: 10px; left: 10px; color: #fff;
+    background: rgba(0,0,0,0.5); padding: 8px 12px; border-radius: 4px;
+    font-size: 13px; line-height: 1.5; pointer-events: none;
+  }
+  #crosshair {
+    position: absolute; top: 50%; left: 50%;
+    width: 20px; height: 20px; margin: -10px 0 0 -10px;
+    pointer-events: none;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ''; position: absolute; background: #fff;
+    box-shadow: 0 0 2px #000;
+  }
+  #crosshair::before { left: 9px; top: 0; width: 2px; height: 20px; }
+  #crosshair::after  { top: 9px; left: 0; height: 2px; width: 20px; }
+  #hotbar {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 4px;
+  }
+  .slot {
+    width: 44px; height: 44px; border: 2px solid #555; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 11px; text-align: center;
+  }
+  .slot.active { border-color: #fff; box-shadow: 0 0 8px #fff; }
+
+  /* --- Login overlay --- */
+  #login {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75); color: #fff; z-index: 20;
+  }
+  #login form {
+    background: rgba(20,20,30,0.95); padding: 24px 28px; border-radius: 8px;
+    display: flex; flex-direction: column; gap: 10px; min-width: 320px;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+  }
+  #login h1 { margin: 0 0 6px; font-size: 22px; text-align: center; }
+  #login small { opacity: 0.7; font-size: 12px; text-align: center; margin-bottom: 6px; }
+  #login label { font-size: 12px; opacity: 0.8; }
+  #login input {
+    padding: 8px 10px; border-radius: 4px; border: 1px solid #444;
+    background: #111; color: #fff; font-family: monospace; font-size: 14px;
+  }
+  #login input:focus { outline: none; border-color: #6af; }
+  #login button {
+    margin-top: 8px; padding: 10px; border-radius: 4px; border: 0;
+    background: #4a8; color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;
+  }
+  #login button:disabled { background: #555; cursor: wait; }
+  #login button:hover:not(:disabled) { background: #5ba; }
+  #login .err { color: #f88; min-height: 18px; font-size: 12px; text-align: center; }
+
+  /* --- Chat --- */
+  #chat {
+    position: absolute; bottom: 80px; left: 12px;
+    max-width: 420px; max-height: 260px; overflow: hidden; pointer-events: none;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  #chat .msg {
+    background: rgba(0,0,0,0.5); color: #fff; padding: 3px 8px; border-radius: 3px;
+    font-size: 12px; align-self: flex-start; transition: opacity 0.6s linear;
+  }
+  #chat .msg.fade { opacity: 0; }
+  #chatInput {
+    position: absolute; bottom: 70px; left: 12px; width: 400px;
+    padding: 6px 10px; border-radius: 3px; border: 1px solid #888;
+    background: rgba(0,0,0,0.7); color: #fff; font-family: monospace; font-size: 13px;
+    display: none; z-index: 15;
+  }
+  #chatInput:focus { outline: none; border-color: #6af; }
+
+  /* --- Name label --- */
+  .nametag {
+    position: absolute; transform: translate(-50%, -100%);
+    background: rgba(0,0,0,0.6); color: #fff; padding: 1px 6px; border-radius: 3px;
+    font-size: 11px; pointer-events: none; white-space: nowrap;
+  }
+
+  /* --- DigDig game panel --- */
+  #gamePanel {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    padding: 10px 14px; border-radius: 6px;
+    font-size: 13px; min-width: 220px; line-height: 1.4;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  #gamePanel .gp-title { font-weight: bold; margin-bottom: 4px; color: #ffe870; }
+  #gamePanel .gp-timer { font-size: 22px; font-family: monospace; color: #ffe870; margin: 2px 0 4px; }
+  #gamePanel .gp-status { opacity: 0.85; font-size: 12px; margin-bottom: 6px; }
+  #gamePanel .gp-row { display: flex; justify-content: space-between; gap: 12px; padding: 1px 0; }
+  #gamePanel .gp-row.me { color: #ffe870; font-weight: bold; }
+  #gamePanel .gp-empty { opacity: 0.55; font-size: 12px; }
+
+  #gameBanner {
+    position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.75); color: #ffe870;
+    padding: 20px 40px; border-radius: 10px;
+    font-size: 24px; font-weight: bold; text-align: center;
+    pointer-events: none; transition: opacity 0.4s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  }
+  #gameBanner.fade { opacity: 0; }
+
+  .hidden { display: none !important; }
+
+  /* --- Mobile / touch controls (shown when body has .touch-ui) --- */
+  .mobile-only { display: none; }
+  body.touch-ui .mobile-only { display: flex; }
+  body.touch-ui { touch-action: none; }
+  body.touch-ui canvas { touch-action: none; }
+
+  #joystick {
+    position: absolute; bottom: 90px; left: 24px;
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.3);
+    z-index: 10; user-select: none;
+  }
+  #joyStick {
+    position: absolute; left: 50%; top: 50%;
+    width: 60px; height: 60px; margin: -30px 0 0 -30px;
+    border-radius: 50%; background: rgba(255,255,255,0.45);
+    pointer-events: none;
+  }
+  .mobile-btn {
+    position: absolute;
+    width: 72px; height: 72px; border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    border: 2px solid rgba(255,255,255,0.55);
+    color: #fff; font-size: 18px; font-weight: bold;
+    align-items: center; justify-content: center;
+    user-select: none; z-index: 10;
+  }
+  .mobile-btn.press { background: rgba(255,255,255,0.35); }
+  #btnJump  { bottom: 30px;  right: 30px; }
+  #btnPlace { bottom: 110px; right: 30px; background: rgba(80,150,80,0.6); }
+  #btnBreak { bottom: 190px; right: 30px; background: rgba(180,80,80,0.6); }
+  #btnChat  {
+    top: 10px; left: 10px;
+    width: 64px; height: 38px; border-radius: 8px; font-size: 13px;
+  }
+
+  body.touch-ui #info { display: none; }
+  body.touch-ui #hotbar { bottom: 12px; padding: 3px; }
+  body.touch-ui .slot { width: 48px; height: 48px; font-size: 10px; }
+  body.touch-ui #chat { bottom: 72px; max-width: 60vw; }
+  body.touch-ui #chatInput { width: 80vw; max-width: 500px; font-size: 16px; padding: 10px 12px; }
+</style>
+</head>
+<body>
+
+<!-- Login form (shown until connected & welcomed) -->
+<div id="login">
+  <form id="loginForm" autocomplete="off">
+    <h1>MyWorld</h1>
+    <small>進入世界</small>
+    <label>伺服器</label>
+    <input id="f_server" type="text" required />
+    <label>房號</label>
+    <input id="f_room" type="text" value="lobby" required maxlength="32" pattern="[A-Za-z0-9_-]+" />
+    <label>名字</label>
+    <input id="f_name" type="text" required maxlength="24" />
+    <label>密碼</label>
+    <input id="f_password" type="password" required maxlength="128" />
+    <button id="f_submit" type="submit">加入</button>
+    <div id="loginErr" class="err"></div>
+  </form>
+</div>
+
+<!-- In-game UI (hidden until connected) -->
+<div id="info" class="hidden">
+  WASD 移動 · 空白跳躍 · 滑鼠視角<br/>
+  左鍵破壞 · 右鍵放置 · 1-5 切換方塊<br/>
+  T 聊天 · Esc 釋放滑鼠
+</div>
+<div id="crosshair" class="hidden"></div>
+<div id="hotbar" class="hidden"></div>
+<div id="chat"></div>
+<input id="chatInput" type="text" maxlength="256" />
+<div id="gamePanel" class="hidden"></div>
+<div id="gameBanner" class="hidden"></div>
+
+<!-- Mobile controls (visible only when body has .touch-ui) -->
+<div id="joystick" class="mobile-only hidden"><div id="joyStick"></div></div>
+<div id="btnJump"  class="mobile-btn mobile-only hidden">跳</div>
+<div id="btnPlace" class="mobile-btn mobile-only hidden">放</div>
+<div id="btnBreak" class="mobile-btn mobile-only hidden">挖</div>
+<div id="btnChat"  class="mobile-btn mobile-only hidden">聊天</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================================
+// Scene setup
+// ============================================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.fog = new THREE.Fog(0x87ceeb, 40, 120);
+
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 500);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(50, 80, 30);
+scene.add(sun);
+
+// ============================================================================
+// Block types (textures via procedural canvas — zero external assets)
+// ============================================================================
+function makeTexture(drawFn) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 16;
+  const ctx = c.getContext('2d');
+  drawFn(ctx);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  return tex;
+}
+
+function noisy(ctx, base, variance) {
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const n = (Math.random() - 0.5) * variance;
+      const r = Math.max(0, Math.min(255, base[0] + n));
+      const g = Math.max(0, Math.min(255, base[1] + n));
+      const b = Math.max(0, Math.min(255, base[2] + n));
+      ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+}
+
+const texGrassTop  = makeTexture(ctx => noisy(ctx, [90, 170, 70], 40));
+const texGrassSide = makeTexture(ctx => {
+  noisy(ctx, [140, 100, 60], 30);
+  ctx.fillStyle = '#5aa840'; ctx.fillRect(0, 0, 16, 4);
+  for (let i = 0; i < 16; i++) {
+    ctx.fillStyle = Math.random() > 0.5 ? '#4a9830' : '#6fc050';
+    ctx.fillRect(i, 3 + (Math.random() * 2 | 0), 1, 1);
+  }
+});
+const texDirt   = makeTexture(ctx => noisy(ctx, [140, 100, 60], 30));
+const texStone  = makeTexture(ctx => noisy(ctx, [130, 130, 130], 40));
+const texWood   = makeTexture(ctx => {
+  noisy(ctx, [120, 80, 45], 20);
+  for (let y = 0; y < 16; y += 3) {
+    ctx.fillStyle = '#6b4420';
+    ctx.fillRect(0, y, 16, 1);
+  }
+});
+const texLeaves = makeTexture(ctx => noisy(ctx, [50, 130, 50], 50));
+const texSand   = makeTexture(ctx => noisy(ctx, [220, 200, 140], 25));
+const texGold   = makeTexture(ctx => {
+  // Saturated gold base with strong contrast specks, easy to spot from across the map.
+  noisy(ctx, [255, 210, 40], 20);
+  for (let i = 0; i < 20; i++) {
+    const x = Math.random() * 16 | 0, y = Math.random() * 16 | 0;
+    ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#b8860b';
+    ctx.fillRect(x, y, 1, 1);
+  }
+});
+
+function matSet(top, side, bottom = side) {
+  return [side, side, top, bottom, side, side].map(t =>
+    new THREE.MeshLambertMaterial({ map: t })
+  );
+}
+
+const BLOCKS = {
+  grass:  { name: '草方塊', mats: matSet(texGrassTop, texGrassSide, texDirt) },
+  dirt:   { name: '泥土',   mats: matSet(texDirt, texDirt) },
+  stone:  { name: '石頭',   mats: matSet(texStone, texStone) },
+  wood:   { name: '木頭',   mats: matSet(texWood, texWood) },
+  leaves: { name: '樹葉',   mats: matSet(texLeaves, texLeaves) },
+  sand:   { name: '沙子',   mats: matSet(texSand, texSand) },
+  gold:   { name: '黃金',   mats: matSet(texGold, texGold) },
+};
+
+const HOTBAR = ['grass', 'dirt', 'stone', 'wood', 'leaves'];
+let selected = 0;
+
+// ============================================================================
+// World (populated from server `welcome` message — no local terrain gen)
+// ============================================================================
+const BLOCK = 1;
+const world = new Map();            // "x,y,z" -> mesh
+const key = (x, y, z) => `${x},${y},${z}`;
+const geo = new THREE.BoxGeometry(BLOCK, BLOCK, BLOCK);
+
+const goldBlocks = new Set();  // "x,y,z" keys of gold — used for "nearest gold" hint
+
+function addBlock(x, y, z, type) {
+  const k = key(x, y, z);
+  if (world.has(k)) return;
+  if (!BLOCKS[type]) return;
+  const mesh = new THREE.Mesh(geo, BLOCKS[type].mats);
+  // Block at integer coord (x,y,z) occupies the voxel [x..x+1, y..y+1, z..z+1] —
+  // matching collides() which uses Math.floor of the player's AABB. Mesh is
+  // centered geometry, so shift by +0.5 to align the visual with that voxel.
+  mesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+  mesh.userData = { x, y, z, type };
+  scene.add(mesh);
+  world.set(k, mesh);
+  if (type === 'gold') goldBlocks.add(k);
+}
+
+function removeBlock(x, y, z) {
+  const k = key(x, y, z);
+  const m = world.get(k);
+  if (!m) return;
+  scene.remove(m);
+  world.delete(k);
+  goldBlocks.delete(k);
+}
+
+// ============================================================================
+// Player / controls
+// ============================================================================
+const player = new THREE.Object3D();
+player.position.set(0, 30, 0);      // Replaced by server spawn on welcome
+player.add(camera);
+scene.add(player);
+
+let yaw = 0, pitch = 0;
+let locked = false;                 // actual pointer-lock state
+let dragging = false;
+let gameActive = false;             // true after welcome, until disconnect
+let chatOpen = false;
+
+const controls = {
+  isLocked: false,                  // reflects gameActive — input gate
+  getObject: () => player,
+};
+
+const canvas = renderer.domElement;
+
+function applyRotation() {
+  player.rotation.y = yaw;
+  camera.rotation.x = pitch;
+}
+
+function requestLock() {
+  if (!gameActive || chatOpen) return;
+  if (canvas.requestPointerLock) {
+    try { canvas.requestPointerLock(); } catch (_) {}
+  }
+}
+
+canvas.addEventListener('click', () => {
+  if (gameActive && !chatOpen && !locked) requestLock();
+});
+
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === canvas;
+});
+
+let dragMoved = 0;
+let dragButton = -1;
+
+canvas.addEventListener('mousedown', e => {
+  if (!gameActive || chatOpen) return;
+  if (!locked) {
+    dragging = true;
+    dragMoved = 0;
+    dragButton = e.button;
+    // Desktop: left-click breaks immediately (no drag threshold). Touch has its own flow
+    // via the 挖 button — canvas drag only rotates the camera.
+    if (e.button === 0 && !isTouch) doAction(0);
+  }
+});
+addEventListener('mouseup', e => {
+  const wasDragging = dragging;
+  dragging = false;
+  if (!gameActive || chatOpen) return;
+  if (locked) return;                // pointer-lock path is handled on mousedown
+  if (!wasDragging) return;
+  if (e.button === 0) return;        // already fired on mousedown
+  if (dragMoved > 5) return;         // treated as camera drag
+  doAction(e.button);
+});
+
+addEventListener('mousemove', e => {
+  if (!gameActive || chatOpen) return;
+  if (!locked && !dragging) return;
+  const dx = e.movementX || 0;
+  const dy = e.movementY || 0;
+  if (dragging) dragMoved += Math.abs(dx) + Math.abs(dy);
+  yaw   -= dx * 0.0025;
+  pitch -= dy * 0.0025;
+  pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+  applyRotation();
+});
+
+const keys = {};
+
+// ============================================================================
+// Touch / mobile controls
+// ============================================================================
+// Analog joystick vector (-1..1, y>0 = stick down).
+// Always declared (zero on desktop) so update() can read it unconditionally.
+const joyVec = { x: 0, y: 0 };
+
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+if (isTouch) document.body.classList.add('touch-ui');
+
+(function setupTouch() {
+  const joystickEl = document.getElementById('joystick');
+  const joyStickEl = document.getElementById('joyStick');
+  let joyPointerId = null;
+
+  function joyUpdate(e) {
+    const r = joystickEl.getBoundingClientRect();
+    const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+    let dx = e.clientX - cx, dy = e.clientY - cy;
+    const max = r.width / 2 - 15;
+    const len = Math.hypot(dx, dy);
+    if (len > max) { dx = dx * max / len; dy = dy * max / len; }
+    joyVec.x = dx / max;
+    joyVec.y = dy / max;
+    joyStickEl.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+  function joyReset() {
+    joyPointerId = null;
+    joyVec.x = 0; joyVec.y = 0;
+    joyStickEl.style.transform = 'translate(0,0)';
+  }
+  joystickEl.addEventListener('pointerdown', e => {
+    if (joyPointerId !== null) return;
+    joyPointerId = e.pointerId;
+    try { joystickEl.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault(); e.stopPropagation();
+    joyUpdate(e);
+  });
+  joystickEl.addEventListener('pointermove', e => {
+    if (e.pointerId !== joyPointerId) return;
+    e.preventDefault();
+    joyUpdate(e);
+  });
+  joystickEl.addEventListener('pointerup', e => {
+    if (e.pointerId !== joyPointerId) return;
+    try { joystickEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    joyReset();
+  });
+  joystickEl.addEventListener('pointercancel', joyReset);
+
+  // Helper: wire a mobile action button to a press handler.
+  function wireBtn(id, onDown, onUp) {
+    const el = document.getElementById(id);
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      el.classList.add('press');
+      onDown && onDown(e);
+    });
+    const release = () => { el.classList.remove('press'); onUp && onUp(); };
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerleave', release);
+  }
+
+  wireBtn('btnJump',
+    () => { keys.Space = true; },
+    () => { keys.Space = false; });
+  wireBtn('btnBreak', () => { if (gameActive && !chatOpen) doAction(0); });
+  wireBtn('btnPlace', () => { if (gameActive && !chatOpen) doAction(2); });
+  wireBtn('btnChat',  () => { if (gameActive && !chatOpen) openChat(); });
+
+  if (!isTouch) return;
+
+  // --- Touch-only canvas look drag -----------------------------------------
+  // Suppress synthesized mouse events from touches on the canvas (otherwise
+  // the desktop mousedown handler would ALSO rotate, doubling the sensitivity).
+  const canvasEl = renderer.domElement;
+  canvasEl.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+
+  let lookId = null, lookX = 0, lookY = 0;
+  canvasEl.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || !gameActive || chatOpen) return;
+    if (lookId !== null) return;
+    lookId = e.pointerId;
+    lookX = e.clientX; lookY = e.clientY;
+    try { canvasEl.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  canvasEl.addEventListener('pointermove', e => {
+    if (e.pointerId !== lookId) return;
+    const dx = e.clientX - lookX, dy = e.clientY - lookY;
+    lookX = e.clientX; lookY = e.clientY;
+    yaw   -= dx * 0.005;
+    pitch -= dy * 0.005;
+    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+    applyRotation();
+  });
+  const endLook = e => {
+    if (e.pointerId !== lookId) return;
+    try { canvasEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    lookId = null;
+  };
+  canvasEl.addEventListener('pointerup', endLook);
+  canvasEl.addEventListener('pointercancel', endLook);
+})();
+
+addEventListener('keydown', e => {
+  // If chat is focused, let the input handle its own keys.
+  if (document.activeElement === chatInputEl) return;
+
+  if (!gameActive) return;
+  if (e.code === 'Escape') {
+    if (chatOpen) { closeChat(); return; }
+    if (locked) document.exitPointerLock();
+    return;
+  }
+  if (e.code === 'KeyT' && !chatOpen) {
+    e.preventDefault();
+    openChat();
+    return;
+  }
+  keys[e.code] = true;
+  if (e.code.startsWith('Digit')) {
+    const n = parseInt(e.code.slice(5)) - 1;
+    if (n >= 0 && n < HOTBAR.length) { selected = n; renderHotbar(); }
+  }
+});
+addEventListener('keyup', e => {
+  if (document.activeElement === chatInputEl) return;
+  keys[e.code] = false;
+});
+
+const velocity = new THREE.Vector3();
+const PLAYER_H = 1.7;
+const GRAVITY = 28;
+const JUMP = 9;
+
+function collides(pos) {
+  const r = 0.3;
+  const minX = Math.floor(pos.x - r), maxX = Math.floor(pos.x + r);
+  const minZ = Math.floor(pos.z - r), maxZ = Math.floor(pos.z + r);
+  const minY = Math.floor(pos.y - PLAYER_H), maxY = Math.floor(pos.y);
+  for (let x = minX; x <= maxX; x++)
+    for (let z = minZ; z <= maxZ; z++)
+      for (let y = minY; y <= maxY; y++)
+        if (world.has(key(x, y, z))) return true;
+  return false;
+}
+
+let onGround = false;
+
+function update(dt) {
+  if (!gameActive || chatOpen) return;
+
+  const speed = 5;
+  // Joystick: y>0 means stick pushed down (move backward); invert for forward.
+  const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joyVec.y;
+  const str = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + joyVec.x;
+
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  dir.y = 0; dir.normalize();
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0));
+
+  const move = new THREE.Vector3()
+    .addScaledVector(dir, fwd)
+    .addScaledVector(right, str);
+  // Clamp magnitude to 1 (preserves analog joystick values <1), then scale by speed.
+  const lenSq = move.lengthSq();
+  if (lenSq > 1) move.multiplyScalar(1 / Math.sqrt(lenSq));
+  move.multiplyScalar(speed);
+
+  velocity.x = move.x;
+  velocity.z = move.z;
+  velocity.y -= GRAVITY * dt;
+
+  if (keys.Space && onGround) { velocity.y = JUMP; onGround = false; }
+
+  const p = player.position;
+
+  p.x += velocity.x * dt;
+  if (collides(p)) { p.x -= velocity.x * dt; velocity.x = 0; }
+
+  p.z += velocity.z * dt;
+  if (collides(p)) { p.z -= velocity.z * dt; velocity.z = 0; }
+
+  p.y += velocity.y * dt;
+  if (collides(p)) {
+    p.y -= velocity.y * dt;
+    if (velocity.y < 0) onGround = true;
+    velocity.y = 0;
+  } else {
+    onGround = false;
+  }
+
+  if (p.y < -30) { p.set(spawn.x, spawn.y, spawn.z); velocity.set(0, 0, 0); }
+}
+
+// ============================================================================
+// Raycast → send to server (no optimistic local apply)
+// ============================================================================
+const raycaster = new THREE.Raycaster();
+raycaster.far = 6;
+const centerVec = new THREE.Vector2(0, 0);
+
+function doAction(button) {
+  raycaster.setFromCamera(centerVec, camera);
+  const hits = raycaster.intersectObjects([...world.values()], false);
+  if (!hits.length) return;
+  const hit = hits[0];
+  const b = hit.object.userData;
+
+  if (button === 0) {
+    net.send({ type: 'break', x: b.x, y: b.y, z: b.z });
+  } else if (button === 2) {
+    const n = hit.face.normal;
+    const nx = b.x + n.x, ny = b.y + n.y, nz = b.z + n.z;
+    // Don't place inside self
+    const pp = player.position;
+    const px = Math.floor(pp.x), pz = Math.floor(pp.z);
+    const pyFeet = Math.floor(pp.y - PLAYER_H), pyHead = Math.floor(pp.y);
+    if (nx === px && nz === pz && (ny === pyFeet || ny === pyHead)) return;
+    net.send({ type: 'place', x: nx, y: ny, z: nz, block: HOTBAR[selected] });
+  }
+}
+
+addEventListener('mousedown', e => {
+  if (!gameActive || chatOpen) return;
+  if (locked) doAction(e.button);
+});
+addEventListener('contextmenu', e => e.preventDefault());
+
+// ============================================================================
+// Hotbar UI
+// ============================================================================
+const hotbarEl = document.getElementById('hotbar');
+function renderHotbar() {
+  hotbarEl.innerHTML = '';
+  HOTBAR.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'slot' + (i === selected ? ' active' : '');
+    d.textContent = `${i + 1}\n${BLOCKS[t].name}`;
+    d.style.whiteSpace = 'pre';
+    d.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      selected = i;
+      renderHotbar();
+    });
+    hotbarEl.appendChild(d);
+  });
+}
+
+// ============================================================================
+// Other-player avatars
+// ============================================================================
+// remotePlayers: Map<id, {mesh, nameLabel, name, color, target:{x,y,z,yaw}}>
+const remotePlayers = new Map();
+const AVATAR_GEO = new THREE.BoxGeometry(0.55, 1.7, 0.4);
+const NOSE_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.1);
+
+function addRemotePlayer({ id, name, color, x, y, z, yaw, pitch }) {
+  if (remotePlayers.has(id)) return;
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(AVATAR_GEO, new THREE.MeshLambertMaterial({ color }));
+  body.position.y = -0.85;          // center box so feet are at group y - 1.7
+  group.add(body);
+  // Face-indicator "nose" on front (positive Z local)
+  const nose = new THREE.Mesh(NOSE_GEO, new THREE.MeshLambertMaterial({ color: 0x222222 }));
+  nose.position.set(0, -0.3, 0.21);
+  group.add(nose);
+
+  scene.add(group);
+
+  const label = document.createElement('div');
+  label.className = 'nametag';
+  label.textContent = name;
+  document.body.appendChild(label);
+
+  remotePlayers.set(id, {
+    mesh: group, nameLabel: label, name, color,
+    target: { x, y, z, yaw, pitch: pitch || 0 },
+  });
+  group.position.set(x, y, z);
+  group.rotation.y = yaw;
+}
+
+function removeRemotePlayer(id) {
+  const p = remotePlayers.get(id);
+  if (!p) return;
+  scene.remove(p.mesh);
+  p.nameLabel.remove();
+  remotePlayers.delete(id);
+}
+
+function updateRemotePlayer(id, pos) {
+  const p = remotePlayers.get(id);
+  if (!p) return;
+  p.target = pos;
+}
+
+// Project world positions to screen each frame to position the HTML name labels.
+const tmpVec = new THREE.Vector3();
+function updateNameLabels() {
+  for (const p of remotePlayers.values()) {
+    // Teleport to latest (no interpolation in v1).
+    p.mesh.position.set(p.target.x, p.target.y, p.target.z);
+    p.mesh.rotation.y = p.target.yaw;
+
+    tmpVec.set(p.target.x, p.target.y + 0.2, p.target.z);
+    tmpVec.project(camera);
+    const behind = tmpVec.z > 1 || tmpVec.z < -1;
+    if (behind || Math.abs(tmpVec.x) > 1 || Math.abs(tmpVec.y) > 1) {
+      p.nameLabel.style.display = 'none';
+    } else {
+      p.nameLabel.style.display = 'block';
+      const sx = (tmpVec.x * 0.5 + 0.5) * innerWidth;
+      const sy = (-tmpVec.y * 0.5 + 0.5) * innerHeight;
+      p.nameLabel.style.left = sx + 'px';
+      p.nameLabel.style.top  = sy + 'px';
+    }
+  }
+}
+
+// ============================================================================
+// Chat UI
+// ============================================================================
+const chatEl = document.getElementById('chat');
+const chatInputEl = document.getElementById('chatInput');
+
+function pushChat(author, text, ts) {
+  const d = document.createElement('div');
+  d.className = 'msg';
+  d.textContent = `<${author}> ${text}`;
+  chatEl.appendChild(d);
+  // Keep max 20 in DOM; older get removed.
+  while (chatEl.children.length > 20) chatEl.removeChild(chatEl.firstChild);
+  // Fade after 10s.
+  setTimeout(() => d.classList.add('fade'), 10000);
+  setTimeout(() => d.remove(), 11000);
+}
+
+function openChat() {
+  chatOpen = true;
+  chatInputEl.style.display = 'block';
+  chatInputEl.value = '';
+  if (document.pointerLockElement) document.exitPointerLock();
+  // Clear any stuck keys from before chat opened.
+  for (const k in keys) keys[k] = false;
+  setTimeout(() => chatInputEl.focus(), 0);
+}
+
+function closeChat() {
+  chatOpen = false;
+  chatInputEl.style.display = 'none';
+  chatInputEl.blur();
+}
+
+chatInputEl.addEventListener('keydown', e => {
+  if (e.code === 'Escape') { e.preventDefault(); closeChat(); return; }
+  if (e.code === 'Enter') {
+    e.preventDefault();
+    const text = chatInputEl.value.trim();
+    if (text) net.send({ type: 'chat', text });
+    closeChat();
+  }
+  // Prevent key events from bubbling to game handlers while typing.
+  e.stopPropagation();
+});
+
+// ============================================================================
+// DigDig game panel
+// ============================================================================
+const gamePanelEl = document.getElementById('gamePanel');
+const gameBannerEl = document.getElementById('gameBanner');
+let gameState = null;
+let myName = null;
+let prevRunning = null;   // detect round transitions for banner
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function fmtTime(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function showBanner(text, ms = 4000) {
+  gameBannerEl.textContent = text;
+  gameBannerEl.classList.remove('hidden', 'fade');
+  clearTimeout(showBanner._t1);
+  clearTimeout(showBanner._t2);
+  showBanner._t1 = setTimeout(() => gameBannerEl.classList.add('fade'), ms);
+  showBanner._t2 = setTimeout(() => gameBannerEl.classList.add('hidden'), ms + 500);
+}
+
+function nearestGoldDistance() {
+  if (!goldBlocks.size) return null;
+  const p = player.position;
+  let best = Infinity;
+  for (const k of goldBlocks) {
+    const [x, y, z] = k.split(',').map(Number);
+    const d = Math.hypot(x - p.x, y - p.y, z - p.z);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function renderGamePanel() {
+  if (!gameState) { gamePanelEl.classList.add('hidden'); return; }
+  gamePanelEl.classList.remove('hidden');
+
+  const now = Date.now();
+  const g = gameState;
+  let timer, status, hint = '';
+  if (g.running) {
+    timer = `⏱ ${fmtTime(g.endsAt - now)}`;
+    status = `剩餘黃金：${g.goldLeft}／${g.totalGold}`;
+    const d = nearestGoldDistance();
+    if (d !== null) hint = `<div class="gp-status">最近的 🪙：約 ${d.toFixed(1)} 格</div>`;
+  } else {
+    timer = `下一輪 ${fmtTime((g.nextRoundAt || now) - now)}`;
+    status = g.winner ? `🏆 本輪冠軍：${escapeHtml(g.winner)}` : '本輪沒有人挖到黃金';
+  }
+
+  let rows = '';
+  if (g.scores && g.scores.length) {
+    for (const s of g.scores.slice(0, 5)) {
+      const cls = s.name === myName ? 'gp-row me' : 'gp-row';
+      rows += `<div class="${cls}"><span>${escapeHtml(s.name)}</span><span>🪙 ${s.count}</span></div>`;
+    }
+  } else {
+    rows = `<div class="gp-empty">還沒有人得分</div>`;
+  }
+
+  gamePanelEl.innerHTML =
+    `<div class="gp-title">🪙 搶金礦 DigDig</div>` +
+    `<div class="gp-timer">${timer}</div>` +
+    `<div class="gp-status">${status}</div>` +
+    hint +
+    rows;
+}
+
+function applyGameState(state) {
+  const was = prevRunning;
+  gameState = state;
+  if (state) {
+    // Round transitions → banner.
+    if (was === true && state.running === false) {
+      showBanner(state.winner ? `🏆 ${state.winner} 獲勝！` : '本輪沒人挖到黃金', 5000);
+    } else if (was === false && state.running === true) {
+      showBanner('⛏ 新一輪開始！', 2500);
+    }
+    prevRunning = state.running;
+  } else {
+    prevRunning = null;
+  }
+  renderGamePanel();
+}
+
+setInterval(() => { if (gameState) renderGamePanel(); }, 250);
+
+// ============================================================================
+// Network layer
+// ============================================================================
+let spawn = { x: 0, y: 30, z: 0 };
+let myId = null;
+
+const net = {
+  ws: null,
+  send(obj) {
+    if (this.ws && this.ws.readyState === 1) {
+      this.ws.send(JSON.stringify(obj));
+    }
+  },
+  connect(url, onOpen, onMsg, onClose) {
+    this.ws = new WebSocket(url);
+    this.ws.onopen    = () => onOpen();
+    this.ws.onmessage = (ev) => { try { onMsg(JSON.parse(ev.data)); } catch {} };
+    this.ws.onclose   = (ev) => onClose(ev);
+    this.ws.onerror   = () => {};
+  },
+};
+
+function applyWelcome(msg) {
+  myId = msg.yourId;
+  if (msg.yourName) myName = msg.yourName;
+  spawn = msg.spawn;
+  player.position.set(spawn.x, spawn.y, spawn.z);
+  velocity.set(0, 0, 0);
+
+  // Apply blocks
+  for (const b of msg.blocks) addBlock(b.x, b.y, b.z, b.type);
+
+  // Apply existing players
+  for (const p of msg.players) addRemotePlayer(p);
+
+  // Chat history (no fade on history replay — show last 8)
+  const hist = msg.chat.slice(-8);
+  for (const c of hist) pushChat(c.author, c.text, c.ts);
+
+  // DigDig game state (null for other rooms)
+  prevRunning = msg.game ? msg.game.running : null;
+  applyGameState(msg.game || null);
+}
+
+function onNetMsg(msg) {
+  switch (msg.type) {
+    case 'welcome':
+      applyWelcome(msg);
+      loginEl.classList.add('hidden');
+      infoEl.classList.remove('hidden');
+      crosshairEl.classList.remove('hidden');
+      hotbarEl.classList.remove('hidden');
+      // Reveal mobile controls — CSS `.mobile-only` only renders them on touch devices.
+      for (const id of ['joystick', 'btnJump', 'btnPlace', 'btnBreak', 'btnChat']) {
+        document.getElementById(id).classList.remove('hidden');
+      }
+      gameActive = true;
+      controls.isLocked = true;
+      renderHotbar();
+      requestLock();
+      break;
+    case 'error':
+      loginErrEl.textContent = msg.message || msg.code;
+      submitBtn.disabled = false;
+      if (net.ws) net.ws.close();
+      break;
+    case 'playerJoin':
+      addRemotePlayer(msg);
+      pushChat('系統', `${msg.name} 加入了世界`, Date.now());
+      break;
+    case 'playerLeave': {
+      const p = remotePlayers.get(msg.id);
+      if (p) pushChat('系統', `${p.name} 離開了`, Date.now());
+      removeRemotePlayer(msg.id);
+      break;
+    }
+    case 'positions':
+      for (const u of msg.updates) {
+        if (u.id === myId) continue;        // don't apply own pos
+        updateRemotePlayer(u.id, u);
+      }
+      break;
+    case 'place':
+      addBlock(msg.x, msg.y, msg.z, msg.block);
+      break;
+    case 'break':
+      removeBlock(msg.x, msg.y, msg.z);
+      break;
+    case 'chat':
+      pushChat(msg.author, msg.text, msg.ts);
+      break;
+    case 'game':
+      applyGameState(msg.state);
+      break;
+  }
+}
+
+// Position send throttle — 15Hz
+let lastPosSent = 0;
+let lastSentPos = null;
+
+function maybeSendPos(now) {
+  if (!gameActive) return;
+  if (now - lastPosSent < 66) return;
+  const p = player.position;
+  const out = { x: p.x, y: p.y, z: p.z, yaw, pitch };
+  // Skip if no change (saves a little bandwidth when idle).
+  if (lastSentPos &&
+      lastSentPos.x === out.x && lastSentPos.y === out.y && lastSentPos.z === out.z &&
+      lastSentPos.yaw === out.yaw && lastSentPos.pitch === out.pitch) return;
+  net.send({ type: 'pos', ...out });
+  lastSentPos = out;
+  lastPosSent = now;
+}
+
+// ============================================================================
+// Login form
+// ============================================================================
+const loginEl     = document.getElementById('login');
+const loginFormEl = document.getElementById('loginForm');
+const loginErrEl  = document.getElementById('loginErr');
+const infoEl      = document.getElementById('info');
+const crosshairEl = document.getElementById('crosshair');
+const submitBtn   = document.getElementById('f_submit');
+const fServer     = document.getElementById('f_server');
+const fRoom       = document.getElementById('f_room');
+const fName       = document.getElementById('f_name');
+const fPassword   = document.getElementById('f_password');
+
+// Default server URL: same origin WS (works both in dev & when served by the node server)
+fServer.value = (location.protocol === 'https:' ? 'wss://' : 'ws://')
+              + (location.host || 'localhost:8080') + '/';
+
+loginFormEl.addEventListener('submit', e => {
+  e.preventDefault();
+  submitBtn.disabled = true;
+  loginErrEl.textContent = '連線中…';
+  const url = fServer.value.trim();
+  const room = fRoom.value.trim();
+  const name = fName.value.trim();
+  const password = fPassword.value;
+  myName = name;
+
+  net.connect(url,
+    () => {
+      loginErrEl.textContent = '登入中…';
+      net.send({ type: 'login', room, name, password });
+    },
+    onNetMsg,
+    (ev) => {
+      if (!gameActive) {
+        submitBtn.disabled = false;
+        if (!loginErrEl.textContent || loginErrEl.textContent === '登入中…' || loginErrEl.textContent === '連線中…') {
+          loginErrEl.textContent = '無法連線（檢查伺服器位址與伺服器狀態）';
+        }
+      } else {
+        alert('已斷線 — 請重新整理頁面');
+      }
+    }
+  );
+});
+
+// ============================================================================
+// Main loop
+// ============================================================================
+const clock = new THREE.Clock();
+function loop() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  updateNameLabels();
+  maybeSendPos(performance.now());
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

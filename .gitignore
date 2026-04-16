@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# SQLite
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# macOS
+.DS_Store
+
+# Editor / tooling caches
+.claude/
+.vscode/
+.idea/
+
+# Logs
+*.log

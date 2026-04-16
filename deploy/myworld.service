@@ -1,0 +1,31 @@
+[Unit]
+Description=MyWorld multiplayer server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# TODO: adjust to the user/path on your VPS
+User=myworld
+Group=myworld
+WorkingDirectory=/srv/myworld
+Environment=NODE_ENV=production
+Environment=PORT=8080
+Environment=HOST=127.0.0.1
+# Optional: override DB path
+# Environment=MYWORLD_DB=/var/lib/myworld/world.db
+ExecStart=/usr/bin/node server/server.js
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+# Basic hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/myworld
+
+[Install]
+WantedBy=multi-user.target
