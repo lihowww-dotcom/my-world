@@ -164,41 +164,56 @@
   body.touch-ui canvas { touch-action: none; }
 
   #joystick {
-    position: absolute; bottom: 90px; left: 24px;
-    width: 130px; height: 130px; border-radius: 50%;
+    position: absolute; bottom: 100px; left: 20px;
+    width: 180px; height: 180px; border-radius: 50%;
     background: rgba(255,255,255,0.12);
     border: 2px solid rgba(255,255,255,0.3);
     z-index: 10; user-select: none;
   }
   #joyStick {
     position: absolute; left: 50%; top: 50%;
-    width: 60px; height: 60px; margin: -30px 0 0 -30px;
+    width: 80px; height: 80px; margin: -40px 0 0 -40px;
     border-radius: 50%; background: rgba(255,255,255,0.45);
     pointer-events: none;
   }
   .mobile-btn {
     position: absolute;
-    width: 72px; height: 72px; border-radius: 50%;
+    width: 90px; height: 90px; border-radius: 50%;
     background: rgba(0,0,0,0.45);
     border: 2px solid rgba(255,255,255,0.55);
-    color: #fff; font-size: 18px; font-weight: bold;
+    color: #fff; font-size: 24px; font-weight: bold;
     align-items: center; justify-content: center;
     user-select: none; z-index: 10;
   }
   .mobile-btn.press { background: rgba(255,255,255,0.35); }
-  #btnJump  { bottom: 30px;  right: 30px; }
-  #btnPlace { bottom: 110px; right: 30px; background: rgba(80,150,80,0.6); }
-  #btnBreak { bottom: 190px; right: 30px; background: rgba(180,80,80,0.6); }
+  /* Horizontal row, vertically centered with joystick (center at bottom 190px) */
+  #btnBreak { bottom: 145px; right: 16px; background: rgba(180,80,80,0.6); }
+  #btnPlace { bottom: 145px; right: 122px; background: rgba(80,150,80,0.6); }
+  #btnJump  { bottom: 145px; right: 228px; }
   #btnChat  {
     top: 10px; left: 10px;
     width: 64px; height: 38px; border-radius: 8px; font-size: 13px;
   }
 
   body.touch-ui #info { display: none; }
-  body.touch-ui #hotbar { bottom: 12px; padding: 3px; }
+  body.touch-ui #hotbar { bottom: 70px; padding: 3px; }
   body.touch-ui .slot { width: 48px; height: 48px; font-size: 10px; }
-  body.touch-ui #chat { bottom: 72px; max-width: 60vw; }
-  body.touch-ui #chatInput { width: 80vw; max-width: 500px; font-size: 16px; padding: 10px 12px; }
+  body.touch-ui #chat {
+    bottom: auto; top: 12px; left: 12px; right: auto;
+    max-width: 70vw; max-height: 200px;
+  }
+  body.touch-ui #chat .msg { font-size: 15px; padding: 4px 10px; }
+  body.touch-ui #chatInput {
+    bottom: 12px; left: 12px; right: 12px; width: auto;
+    font-size: 20px; padding: 0 16px; height: 48px;
+    border-radius: 10px; box-sizing: border-box;
+  }
+  body.touch-ui #btnChat {
+    top: auto; left: 12px; bottom: 12px;
+    width: auto; height: 48px; padding: 0 20px;
+    border-radius: 10px; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
 </style>
 </head>
 <body>
@@ -819,10 +834,13 @@ function pushChat(author, text, ts) {
   setTimeout(() => d.remove(), 11000);
 }
 
+const btnChatEl = document.getElementById('btnChat');
+
 function openChat() {
   chatOpen = true;
   chatInputEl.style.display = 'block';
   chatInputEl.value = '';
+  if (btnChatEl) btnChatEl.style.display = 'none';
   if (document.pointerLockElement) document.exitPointerLock();
   // Clear any stuck keys from before chat opened.
   for (const k in keys) keys[k] = false;
@@ -833,6 +851,14 @@ function closeChat() {
   chatOpen = false;
   chatInputEl.style.display = 'none';
   chatInputEl.blur();
+  if (btnChatEl) btnChatEl.style.display = '';
+}
+
+// On touch devices, close chat when input loses focus
+if (isTouch) {
+  chatInputEl.addEventListener('blur', () => {
+    if (chatOpen) closeChat();
+  });
 }
 
 chatInputEl.addEventListener('keydown', e => {
@@ -988,21 +1014,29 @@ function applyWelcome(msg) {
 
 function onNetMsg(msg) {
   switch (msg.type) {
-    case 'welcome':
+    case 'welcome': {
       applyWelcome(msg);
       loginEl.classList.add('hidden');
       infoEl.classList.remove('hidden');
       crosshairEl.classList.remove('hidden');
-      hotbarEl.classList.remove('hidden');
+      const isDigDig = fRoom.value.trim() === 'digdig';
+      // In digdig mode, hide place button and hotbar (only breaking matters)
+      if (!isDigDig) {
+        hotbarEl.classList.remove('hidden');
+        renderHotbar();
+      }
       // Reveal mobile controls — CSS `.mobile-only` only renders them on touch devices.
-      for (const id of ['joystick', 'btnJump', 'btnPlace', 'btnBreak', 'btnChat']) {
+      for (const id of ['joystick', 'btnJump', 'btnBreak', 'btnChat']) {
         document.getElementById(id).classList.remove('hidden');
+      }
+      if (!isDigDig) {
+        document.getElementById('btnPlace').classList.remove('hidden');
       }
       gameActive = true;
       controls.isLocked = true;
-      renderHotbar();
       requestLock();
       break;
+    }
     case 'error':
       loginErrEl.textContent = msg.message || msg.code;
       submitBtn.disabled = false;
