@@ -2,6 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>MyWorld — Three.js Minecraft</title>
 <style>
   body { margin: 0; overflow: hidden; font-family: monospace; background: #87ceeb; }
@@ -186,10 +187,16 @@
     user-select: none; z-index: 10;
   }
   .mobile-btn.press { background: rgba(255,255,255,0.35); }
-  /* Horizontal row, vertically centered with joystick (center at bottom 190px) */
-  #btnBreak { bottom: 145px; right: 16px; background: rgba(180,80,80,0.6); }
-  #btnPlace { bottom: 145px; right: 122px; background: rgba(80,150,80,0.6); }
-  #btnJump  { bottom: 145px; right: 228px; }
+  /* Minecraft-style: only one big jump button at bottom-right.
+     Place = tap canvas; break = long-press canvas. */
+  #btnBreak, #btnPlace { display: none !important; }
+  #btnJump {
+    bottom: 130px; right: 30px;
+    width: 130px; height: 130px;
+    background: rgba(255,255,255,0.18);
+    border: 3px solid rgba(255,255,255,0.55);
+    font-size: 32px;
+  }
   #btnChat  {
     top: 10px; left: 10px;
     width: 64px; height: 38px; border-radius: 8px; font-size: 13px;
@@ -427,6 +434,7 @@ let locked = false;                 // actual pointer-lock state
 let dragging = false;
 let gameActive = false;             // true after welcome, until disconnect
 let chatOpen = false;
+let isDigDig = false;               // set on welcome from room name
 
 // View mode: 0 = first person (default), 1 = third person (over-the-shoulder)
 let viewMode = 0;
@@ -593,32 +601,75 @@ if (isTouch) document.body.classList.add('touch-ui');
 
   if (!isTouch) return;
 
-  // --- Touch-only canvas look drag -----------------------------------------
-  // Suppress synthesized mouse events from touches on the canvas (otherwise
-  // the desktop mousedown handler would ALSO rotate, doubling the sensitivity).
+  // --- Touch-only canvas: tap = place, long-press = break, drag = look ----
+  // Minecraft Bedrock-style controls: no break/place buttons. The user aims
+  // with the crosshair (centre of screen) and:
+  //   - quick tap on canvas → place block from the selected hotbar slot
+  //   - long-press on canvas (>= LONG_PRESS_MS, no movement) → break block
+  //   - drag → rotate camera
+  // Movement past TAP_DRAG_THRESHOLD pixels promotes the gesture to drag and
+  // cancels both place (on release) and the pending break timer.
   const canvasEl = renderer.domElement;
   canvasEl.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 
-  let lookId = null, lookX = 0, lookY = 0;
+  const TAP_DRAG_THRESHOLD = 10;     // px before gesture is treated as drag
+  const LONG_PRESS_MS = 250;         // hold duration that triggers break
+
+  let lookId = null;
+  let lookX = 0, lookY = 0;
+  let lookStartX = 0, lookStartY = 0;
+  let longPressTimer = null;
+  let didLongPress = false;
+  let didDrag = false;
+
   canvasEl.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'touch' || !gameActive || chatOpen) return;
     if (lookId !== null) return;
     lookId = e.pointerId;
-    lookX = e.clientX; lookY = e.clientY;
+    lookX = lookStartX = e.clientX;
+    lookY = lookStartY = e.clientY;
+    didLongPress = false;
+    didDrag = false;
     try { canvasEl.setPointerCapture(e.pointerId); } catch (_) {}
+    longPressTimer = setTimeout(() => {
+      longPressTimer = null;
+      if (didDrag) return;            // gesture became drag before timer fired
+      didLongPress = true;
+      doAction(0);                    // break block under crosshair
+    }, LONG_PRESS_MS);
   });
+
   canvasEl.addEventListener('pointermove', e => {
     if (e.pointerId !== lookId) return;
     const dx = e.clientX - lookX, dy = e.clientY - lookY;
     lookX = e.clientX; lookY = e.clientY;
+
+    // Promote to drag once cumulative movement exceeds threshold.
+    if (!didDrag) {
+      const totDx = e.clientX - lookStartX;
+      const totDy = e.clientY - lookStartY;
+      if (totDx*totDx + totDy*totDy > TAP_DRAG_THRESHOLD * TAP_DRAG_THRESHOLD) {
+        didDrag = true;
+        if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+      } else {
+        return;                       // ignore micro-jitter before drag threshold
+      }
+    }
     yaw   -= dx * 0.005;
     pitch -= dy * 0.005;
     pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
     applyRotation();
   });
+
   const endLook = e => {
     if (e.pointerId !== lookId) return;
     try { canvasEl.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    // Quick tap (no drag, no long-press fired) → place block.
+    // Skip place in digdig mode (only breaking matters there).
+    if (!didDrag && !didLongPress && !isDigDig) {
+      doAction(2);
+    }
     lookId = null;
   };
   canvasEl.addEventListener('pointerup', endLook);
@@ -1067,18 +1118,16 @@ function onNetMsg(msg) {
       loginEl.classList.add('hidden');
       infoEl.classList.remove('hidden');
       crosshairEl.classList.remove('hidden');
-      const isDigDig = fRoom.value.trim() === 'digdig';
+      isDigDig = fRoom.value.trim() === 'digdig';
       // In digdig mode, hide place button and hotbar (only breaking matters)
       if (!isDigDig) {
         hotbarEl.classList.remove('hidden');
         renderHotbar();
       }
       // Reveal mobile controls — CSS `.mobile-only` only renders them on touch devices.
-      for (const id of ['joystick', 'btnJump', 'btnBreak', 'btnChat']) {
+      // Minecraft-style: no break/place buttons (use tap/long-press on canvas instead).
+      for (const id of ['joystick', 'btnJump', 'btnChat']) {
         document.getElementById(id).classList.remove('hidden');
-      }
-      if (!isDigDig) {
-        document.getElementById('btnPlace').classList.remove('hidden');
       }
       gameActive = true;
       controls.isLocked = true;
