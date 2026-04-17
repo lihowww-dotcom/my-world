@@ -428,6 +428,32 @@ let dragging = false;
 let gameActive = false;             // true after welcome, until disconnect
 let chatOpen = false;
 
+// View mode: 0 = first person (default), 1 = third person (over-the-shoulder)
+let viewMode = 0;
+const TP_DISTANCE = 5;              // distance behind player in third person
+const TP_HEIGHT = 1.4;              // height above eye level looking down on player
+
+// Local player avatar — visible only in third person.
+// Rendered as a separate mesh that mirrors the player's transform each frame
+// (NOT a child of `player`, so we don't see it through the back of its head).
+const localAvatar = new THREE.Group();
+const localBody = new THREE.Mesh(
+  new THREE.BoxGeometry(0.55, 1.7, 0.4),
+  new THREE.MeshLambertMaterial({ color: 0x6699cc })
+);
+localBody.position.y = -0.85;
+localAvatar.add(localBody);
+const localNose = new THREE.Mesh(
+  new THREE.BoxGeometry(0.12, 0.12, 0.1),
+  new THREE.MeshLambertMaterial({ color: 0x222222 })
+);
+// Nose at -Z so the avatar's "face" matches the player's forward direction
+// (the camera looks down -Z by default, so player's "forward" is local -Z).
+localNose.position.set(0, -0.3, -0.21);
+localAvatar.add(localNose);
+localAvatar.visible = false;
+scene.add(localAvatar);
+
 const controls = {
   isLocked: false,                  // reflects gameActive — input gate
   getObject: () => player,
@@ -861,12 +887,34 @@ if (isTouch) {
   });
 }
 
+function handleSlashCommand(text) {
+  // Returns true if `text` was a recognised local command (so don't send to server).
+  if (text === '/view0') {
+    setViewMode(0);
+    return true;
+  }
+  if (text === '/view1') {
+    setViewMode(1);
+    return true;
+  }
+  return false;
+}
+
+function setViewMode(m) {
+  viewMode = m;
+  localAvatar.visible = (m === 1);
+}
+
 chatInputEl.addEventListener('keydown', e => {
   if (e.code === 'Escape') { e.preventDefault(); closeChat(); return; }
   if (e.code === 'Enter') {
     e.preventDefault();
     const text = chatInputEl.value.trim();
-    if (text) net.send({ type: 'chat', text });
+    if (text) {
+      if (!handleSlashCommand(text)) {
+        net.send({ type: 'chat', text });
+      }
+    }
     closeChat();
   }
   // Prevent key events from bubbling to game handlers while typing.
@@ -1163,11 +1211,27 @@ const clock = new THREE.Clock();
 function loop() {
   const dt = Math.min(clock.getDelta(), 0.05);
   update(dt);
+  updateViewMode();
   updateNameLabels();
   maybeSendPos(performance.now());
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
+
+// Per-frame: keep camera + local avatar consistent with the current viewMode.
+function updateViewMode() {
+  if (viewMode === 1) {
+    // Third person: camera offset behind+above player (in player local frame).
+    // player local +Z = behind, since camera looks down -Z by default.
+    camera.position.set(0, TP_HEIGHT, TP_DISTANCE);
+    // Mirror player transform onto the avatar so it walks/turns with us.
+    localAvatar.position.copy(player.position);
+    localAvatar.rotation.y = player.rotation.y;
+  } else {
+    camera.position.set(0, 0, 0);
+  }
+}
+
 loop();
 </script>
 </body>
